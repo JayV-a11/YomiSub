@@ -30,6 +30,9 @@ async function bootstrap(): Promise<void> {
   // ---- Shadow DOM host -------------------------------------------------------
   const host = document.createElement('div')
   host.id = OVERLAY_ROOT_ID
+  // Cover the full viewport so the absolute-positioned overlay appears over the video
+  host.style.cssText =
+    'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2147483640;'
   // Shadow DOM isolates YomiSub styles from YouTube — prevents conflicts
   const shadow = host.attachShadow({ mode: 'closed' })
   document.body.appendChild(host)
@@ -55,7 +58,16 @@ async function bootstrap(): Promise<void> {
   }
 
   async function onVideoFound(video: HTMLVideoElement): Promise<void> {
-    if (!hasJapaneseSubtitles()) {
+    // YouTube SPA: ytInitialPlayerResponse may not be ready immediately after navigation.
+    // Retry up to 10 times with 300 ms intervals (3 s total) before giving up.
+    let found = hasJapaneseSubtitles()
+    if (!found) {
+      for (let i = 0; i < 10 && !found; i++) {
+        await new Promise<void>((r) => setTimeout(r, 300))
+        found = hasJapaneseSubtitles()
+      }
+    }
+    if (!found) {
       logger('No Japanese subtitle track found for this video')
       return
     }
