@@ -184,10 +184,10 @@ export async function fetchSubtitleCues(track: CaptionTrack): Promise<SubtitleCu
   // Try the URL as-is first (YouTube already includes fmt in baseUrl sometimes)
   const tryFetch = async (url: string): Promise<string> => {
     const r = await fetch(url)
-    logger(`fetch ${url.slice(0, 80)} → HTTP ${r.status}, content-type: ${r.headers.get('content-type')}`)
+    logger(`fetch ${url.slice(0, 80)} → HTTP ${r.status}`)
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const text = await r.text()
-    logger(`response length: ${text.length}, first 300:`, text.slice(0, 300))
+    logger(`response length: ${text.length}`)
     return text
   }
 

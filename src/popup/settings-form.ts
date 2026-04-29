@@ -37,6 +37,12 @@ export function renderSettingsForm(container: HTMLElement): void {
   // Enable field toggles based on provider selection
   const providerSelect = form.querySelector<HTMLSelectElement>('#ys-provider')
   providerSelect?.addEventListener('change', () => toggleApiKeyField(form))
+
+  // Font size slider label (wired here instead of inline oninput to comply with CSP)
+  const slider = form.querySelector<HTMLInputElement>('#ys-font-size')
+  slider?.addEventListener('input', () => {
+    updateSliderLabel(form, parseInt(slider.value))
+  })
 }
 
 // ---- Population ------------------------------------------------------------
@@ -203,8 +209,7 @@ function buildSkeleton(): string {
       <div class="ys-row">
         <label for="ys-font-size">Subtitle font size</label>
         <div class="ys-slider">
-          <input type="range" id="ys-font-size" min="0" max="2" step="1" value="1"
-            oninput="document.getElementById('ys-font-label').textContent = ['14px (small)','18px (medium)','24px (large)'][this.value]" />
+          <input type="range" id="ys-font-size" min="0" max="2" step="1" value="1" />
           <span class="ys-slider-label" id="ys-font-label">18px (medium)</span>
         </div>
       </div>
@@ -251,7 +256,7 @@ function buildSkeleton(): string {
 
       <button type="submit" class="ys-btn ys-btn-save">Save settings</button>
 
-      <p class="ys-status" id="ys-status"></p>
+      <p class="ys-status" id="ys-status" role="status" aria-live="polite" aria-atomic="true"></p>
     </form>
   `
 }

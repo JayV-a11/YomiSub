@@ -47,7 +47,7 @@ async function bootstrap(): Promise<void> {
 
   overlay.mount(shadow)
   tooltip.mount(shadow)
-  overlay.updateSettings(FONT_SIZE_MAP[settings.fontSize], settings.overlayPosition)
+  overlay.updateSettings(FONT_SIZE_MAP[settings.fontSize], settings.overlayPosition, settings.furiganaEnabled)
 
   // ---- Kuromoji pre-warm (non-blocking) -------------------------------------
   initTokenizer().catch((err) => logger('Tokenizer init failed:', err))

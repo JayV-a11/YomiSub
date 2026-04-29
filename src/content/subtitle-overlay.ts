@@ -20,7 +20,7 @@ export interface OverlayController {
   stopSync: () => void
   showWords: (words: Word[]) => void
   clearWords: () => void
-  updateSettings: (fontSize: string, position: 'over' | 'below') => void
+  updateSettings: (fontSize: string, position: 'over' | 'below', furiganaEnabled?: boolean) => void
 }
 
 export function createOverlayController(
@@ -29,6 +29,7 @@ export function createOverlayController(
   let container: HTMLDivElement | null = null
   let rafId: number | null = null
   let lastRenderedText: string | null = null
+  let furigana = false
 
   // ---- Mounting -------------------------------------------------------------
 
@@ -85,10 +86,20 @@ export function createOverlayController(
   function createWordSpan(word: Word): HTMLSpanElement {
     const span = document.createElement('span')
     span.className = 'ys-word'
-    span.textContent = word.surface
     span.setAttribute('role', 'button')
     span.setAttribute('tabindex', '0')
     span.setAttribute('aria-label', `${word.surface} — ${word.reading}`)
+
+    if (furigana && word.reading && word.reading !== word.surface) {
+      const ruby = document.createElement('ruby')
+      ruby.appendChild(document.createTextNode(word.surface))
+      const rt = document.createElement('rt')
+      rt.textContent = word.reading
+      ruby.appendChild(rt)
+      span.appendChild(ruby)
+    } else {
+      span.textContent = word.surface
+    }
 
     span.addEventListener('click', (e) => {
       e.stopPropagation()
@@ -152,10 +163,12 @@ export function createOverlayController(
 
   // ---- Settings -------------------------------------------------------------
 
-  function updateSettings(fontSize: string, position: 'over' | 'below'): void {
+  function updateSettings(fontSize: string, position: 'over' | 'below', furiganaEnabled = false): void {
+    furigana = furiganaEnabled
     if (container === null) return
     container.style.setProperty('--ys-font-size', fontSize)
     container.dataset['position'] = position
+    container.dataset['furigana'] = furiganaEnabled ? 'true' : 'false'
   }
 
   return { mount, unmount, sync, stopSync, showWords, clearWords, updateSettings }
@@ -185,6 +198,13 @@ function overlayStyles(): string {
       left: auto;
       transform: none;
       margin-top: 0.5em;
+    }
+
+    ruby { display: inline ruby; }
+    rt {
+      font-size: 0.55em;
+      color: #ffd;
+      font-family: 'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif;
     }
 
     .ys-word {

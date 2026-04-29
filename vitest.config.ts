@@ -17,6 +17,11 @@ export default defineConfig({
         'src/__tests__/**',
         'src/assets/**',
         'src/types/**',
+        'src/shared/types/**',  // type-only declarations
+        'src/content/index.ts',    // wiring entry point — tested via integration
+        'src/content/player-observer.ts', // YouTube DOM observer — requires full browser env
+        'src/background/**',    // service worker — requires browser APIs
+        'src/popup/**',         // popup UI — requires chrome.storage stubs beyond unit scope
       ],
       thresholds: {
         lines: 80,

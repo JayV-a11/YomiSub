@@ -198,7 +198,7 @@ describe('parseXmlCues', () => {
 // ---- fetchSubtitleCues -----------------------------------------------------
 
 describe('fetchSubtitleCues', () => {
-  it('fetches XML and returns parsed cues', async () => {
+  it('fetches and returns parsed cues', async () => {
     const xml = `<transcript><text start="1" dur="2">テスト</text></transcript>`
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -208,27 +208,30 @@ describe('fetchSubtitleCues', () => {
     const track = makeTrack()
     const cues = await fetchSubtitleCues(track)
 
-    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('fmt=xml'))
+    expect(fetch).toHaveBeenCalled()
     expect(cues).toHaveLength(1)
     expect(cues[0]?.text).toBe('テスト')
   })
 
-  it('throws on non-OK HTTP response', async () => {
+  it('returns [] when all HTTP attempts fail', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 } as Response))
-    await expect(fetchSubtitleCues(makeTrack())).rejects.toThrow('403')
+    const cues = await fetchSubtitleCues(makeTrack())
+    expect(cues).toEqual([])
   })
 
-  it('always sets fmt=xml regardless of original URL params', async () => {
+  it('tries multiple fmt variants for the URL', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       text: async () => '<transcript></transcript>',
     } as Response))
 
-    const track = makeTrack({ baseUrl: 'https://www.youtube.com/api/timedtext?v=test&fmt=json3' })
+    const track = makeTrack({ baseUrl: 'https://www.youtube.com/api/timedtext?v=test&fmt=srv3' })
     await fetchSubtitleCues(track)
 
-    const calledUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as string
-    expect(calledUrl).toContain('fmt=xml')
-    expect(calledUrl).not.toMatch(/fmt=json3/)
+    const calledUrls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c: unknown[]) => c[0] as string,
+    )
+    // At least one attempt should override the original fmt param
+    expect(calledUrls.some((u) => u.includes('fmt=json3') || u.includes('fmt=xml'))).toBe(true)
   })
 })

@@ -46,6 +46,13 @@ export function createTooltipController(): TooltipController {
       }
     }
     document.addEventListener('click', outsideClickHandler, { capture: true })
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && visible) {
+        hide()
+      }
+    })
   }
 
   // ---- Show/hide ------------------------------------------------------------
