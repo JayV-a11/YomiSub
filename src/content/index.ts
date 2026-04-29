@@ -17,7 +17,7 @@ import { initTokenizer, segmentText } from './word-segmenter'
 import { createOverlayController } from './subtitle-overlay'
 import { createTooltipController } from './word-tooltip'
 import { lookupWord } from './jmdict-lookup'
-import type { Word } from '@/shared/types'
+import type { Word, LookupResult, Message } from '@/shared/types'
 
 async function bootstrap(): Promise<void> {
   console.log('[YomiSub] bootstrap() starting on', location.href)
@@ -43,7 +43,23 @@ async function bootstrap(): Promise<void> {
   const overlay = createOverlayController(
     debounce((word: Word, rect: DOMRect) => void handleWordClick(word, rect), TOOLTIP_DEBOUNCE_MS),
   )
-  const tooltip = createTooltipController()
+  const tooltip = createTooltipController({
+    onSave: (word: Word, result: LookupResult) =>
+      new Promise((resolve, reject) => {
+        const msg: Message = { type: 'ADD_FLASHCARD', payload: { word, result } }
+        chrome.runtime.sendMessage(msg, (response: Message) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+            return
+          }
+          if (response.type === 'ADD_FLASHCARD_RESULT' && response.success) {
+            resolve({ isNew: response.isNew })
+          } else if (response.type === 'ADD_FLASHCARD_RESULT') {
+            reject(new Error(response.error ?? 'Failed to save flashcard'))
+          }
+        })
+      }),
+  })
 
   overlay.mount(shadow)
   tooltip.mount(shadow)

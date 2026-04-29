@@ -197,3 +197,96 @@ describe('createTooltipController — outside click', () => {
     expect(controller.isVisible()).toBe(false)
   })
 })
+
+// ---- Save button -----------------------------------------------------------
+
+describe('createTooltipController — save button', () => {
+  it('renders save button when onSave callback is provided', () => {
+    const shadow = makeShadow()
+    const controller = createTooltipController({ onSave: vi.fn().mockResolvedValue({ isNew: true }) })
+    controller.mount(shadow)
+
+    controller.show(makeWord(), makeAnchorRect(), makeResult())
+
+    const btn = shadow.querySelector('.ys-save-btn')
+    expect(btn).not.toBeNull()
+    expect(btn?.textContent).toContain('Add to deck')
+  })
+
+  it('does not render save button when no onSave callback', () => {
+    const shadow = makeShadow()
+    const controller = createTooltipController()
+    controller.mount(shadow)
+
+    controller.show(makeWord(), makeAnchorRect(), makeResult())
+
+    expect(shadow.querySelector('.ys-save-btn')).toBeNull()
+  })
+
+  it('calls onSave with current word and result when save button is clicked', async () => {
+    const onSave = vi.fn().mockResolvedValue({ isNew: true })
+    const shadow = makeShadow()
+    const controller = createTooltipController({ onSave })
+    controller.mount(shadow)
+
+    const word = makeWord('学生')
+    const result = makeResult({ word: '学生' })
+    controller.show(word, makeAnchorRect(), result)
+
+    const btn = shadow.querySelector<HTMLButtonElement>('.ys-save-btn')!
+    btn.click()
+
+    // Allow microtask queue to flush
+    await Promise.resolve()
+
+    expect(onSave).toHaveBeenCalledWith(word, result)
+  })
+
+  it('shows "✓ Saved" feedback when onSave resolves with isNew=true', async () => {
+    const onSave = vi.fn().mockResolvedValue({ isNew: true })
+    const shadow = makeShadow()
+    const controller = createTooltipController({ onSave })
+    controller.mount(shadow)
+
+    controller.show(makeWord(), makeAnchorRect(), makeResult())
+
+    const btn = shadow.querySelector<HTMLButtonElement>('.ys-save-btn')!
+    btn.click()
+
+    await vi.waitFor(() => {
+      expect(btn.textContent).toContain('Saved')
+    })
+  })
+
+  it('shows "Already in deck" when onSave resolves with isNew=false', async () => {
+    const onSave = vi.fn().mockResolvedValue({ isNew: false })
+    const shadow = makeShadow()
+    const controller = createTooltipController({ onSave })
+    controller.mount(shadow)
+
+    controller.show(makeWord(), makeAnchorRect(), makeResult())
+
+    const btn = shadow.querySelector<HTMLButtonElement>('.ys-save-btn')!
+    btn.click()
+
+    await vi.waitFor(() => {
+      expect(btn.textContent).toContain('Already in deck')
+    })
+  })
+
+  it('disables the button after clicking', async () => {
+    const onSave = vi.fn().mockResolvedValue({ isNew: true })
+    const shadow = makeShadow()
+    const controller = createTooltipController({ onSave })
+    controller.mount(shadow)
+
+    controller.show(makeWord(), makeAnchorRect(), makeResult())
+
+    const btn = shadow.querySelector<HTMLButtonElement>('.ys-save-btn')!
+    btn.click()
+
+    await vi.waitFor(() => {
+      expect(btn.disabled).toBe(true)
+    })
+  })
+})

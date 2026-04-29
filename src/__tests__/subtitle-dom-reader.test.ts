@@ -18,13 +18,13 @@ function clearCaptionSegments(): void {
 // ---- Tests -----------------------------------------------------------------
 
 describe('watchYoutubeSubtitles', () => {
-  let onText: ReturnType<typeof vi.fn>
-  let onClear: ReturnType<typeof vi.fn>
+  let onText: ReturnType<typeof vi.fn<(text: string) => void>>
+  let onClear: ReturnType<typeof vi.fn<() => void>>
   let stopWatch: (() => void) | null = null
 
   beforeEach(() => {
-    onText = vi.fn()
-    onClear = vi.fn()
+    onText = vi.fn<(text: string) => void>()
+    onClear = vi.fn<() => void>()
     clearCaptionSegments()
   })
 
@@ -91,7 +91,7 @@ describe('watchYoutubeSubtitles', () => {
     addCaptionSegment('いい天気')
     await new Promise<void>((resolve) => setTimeout(resolve, 0))
 
-    const lastCall = onText.mock.calls.at(-1)?.[0] as string
+    const lastCall = onText.mock.calls[onText.mock.calls.length - 1]?.[0] as string
     expect(lastCall).toBe('今日はいい天気')
   })
 

@@ -181,11 +181,6 @@ function updateSliderLabel(form: HTMLFormElement, index: number): void {
 
 function buildSkeleton(): string {
   return `
-    <div class="ys-header">
-      <h1>YomiSub</h1>
-      <span class="ys-badge">MVP 0.1</span>
-    </div>
-
     <form id="ys-form" autocomplete="off">
 
       <div class="ys-toggle-row">

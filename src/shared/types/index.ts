@@ -83,6 +83,25 @@ export interface UserSettings {
   furiganaEnabled: boolean
 }
 
+// ---------- Flashcards / SRS ----------
+
+export interface FlashCard {
+  id: string              // = dictionaryForm (unique key per lemma)
+  word: string            // surface form e.g. "学生"
+  reading: string         // hiragana reading e.g. "がくせい"
+  dictionaryForm: string  // base/lemma form e.g. "学生"
+  partOfSpeech: string
+  definitions: string[]
+  source: 'jmdict' | 'api' | 'not-found'
+  // SM-2 SRS fields
+  interval: number        // days until next review
+  repetitions: number     // successful review streak
+  easeFactor: number      // SM-2 ease factor (default 2.5)
+  dueDate: number         // ms timestamp when next review is due
+  addedAt: number         // ms timestamp when card was created
+  lastReviewedAt: number | null
+}
+
 // ---------- Messages (content ↔ service worker) ----------
 
 export type Message =
@@ -93,3 +112,11 @@ export type Message =
   | { type: 'SAVE_SETTINGS_RESULT'; success: boolean; error?: string }
   | { type: 'TRANSLATE_WORD'; payload: { word: string; context?: string } }
   | { type: 'TRANSLATE_WORD_RESULT'; payload: LookupResult }
+  | { type: 'ADD_FLASHCARD'; payload: { word: Word; result: LookupResult } }
+  | { type: 'ADD_FLASHCARD_RESULT'; success: boolean; isNew: boolean; error?: string }
+  | { type: 'GET_FLASHCARDS' }
+  | { type: 'GET_FLASHCARDS_RESULT'; payload: FlashCard[] }
+  | { type: 'REVIEW_FLASHCARD'; payload: { id: string; quality: number } }
+  | { type: 'REVIEW_FLASHCARD_RESULT'; success: boolean; card?: FlashCard; error?: string }
+  | { type: 'DELETE_FLASHCARD'; payload: { id: string } }
+  | { type: 'DELETE_FLASHCARD_RESULT'; success: boolean; error?: string }

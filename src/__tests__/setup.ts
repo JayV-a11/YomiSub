@@ -4,6 +4,7 @@ import { vi, afterEach } from 'vitest'
 // Provides a full chrome mock that mirrors the real API shape used by YomiSub.
 
 const storageSyncStore: Record<string, unknown> = {}
+const storageLocalStore: Record<string, unknown> = {}
 
 const chromeMock = {
   storage: {
@@ -30,9 +31,26 @@ const chromeMock = {
       }),
     },
     local: {
-      get: vi.fn((_keys: unknown, callback: (r: Record<string, unknown>) => void) => callback({})),
-      set: vi.fn((_items: unknown, callback?: () => void) => callback?.()),
-      remove: vi.fn((_keys: unknown, callback?: () => void) => callback?.()),
+      get: vi.fn((keys: string | string[] | null, callback: (result: Record<string, unknown>) => void) => {
+        if (typeof keys === 'string') {
+          callback({ [keys]: storageLocalStore[keys] })
+        } else if (Array.isArray(keys)) {
+          const result: Record<string, unknown> = {}
+          for (const k of keys) result[k] = storageLocalStore[k]
+          callback(result)
+        } else {
+          callback({ ...storageLocalStore })
+        }
+      }),
+      set: vi.fn((items: Record<string, unknown>, callback?: () => void) => {
+        Object.assign(storageLocalStore, items)
+        callback?.()
+      }),
+      remove: vi.fn((keys: string | string[], callback?: () => void) => {
+        const ks = Array.isArray(keys) ? keys : [keys]
+        for (const k of ks) delete storageLocalStore[k]
+        callback?.()
+      }),
     },
     session: {
       get: vi.fn((_keys: unknown, callback: (r: Record<string, unknown>) => void) => callback({})),
@@ -63,9 +81,13 @@ Object.defineProperty(globalThis, 'chrome', {
 afterEach(() => {
   vi.clearAllMocks()
   chromeMock.runtime.lastError = null
-  // Clear storage store
+  // Clear sync store
   for (const key of Object.keys(storageSyncStore)) {
     delete storageSyncStore[key]
+  }
+  // Clear local store
+  for (const key of Object.keys(storageLocalStore)) {
+    delete storageLocalStore[key]
   }
 })
 

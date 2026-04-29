@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(node -e \"const v = require\\('./node_modules/vitest/package.json'\\); console.log\\(v.version\\)\")"
+    ]
+  }
+}

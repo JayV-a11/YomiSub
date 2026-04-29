@@ -214,3 +214,356 @@ body {
   border-top: 1px solid #333;
   margin: 12px 0;
 }
+
+/* ---- Tab bar ---- */
+.ys-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 0;
+}
+
+.ys-tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #888;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ys-tab-btn:hover {
+  color: #ccc;
+}
+
+.ys-tab-btn.active {
+  color: #90b0ff;
+  border-bottom-color: #90b0ff;
+}
+
+/* ---- Flashcard stats ---- */
+.ys-fc-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ys-fc-stat {
+  flex: 1;
+  background: #252540;
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.ys-fc-stat-n {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.ys-fc-due-n {
+  color: #90b0ff;
+}
+
+.ys-fc-stat-l {
+  display: block;
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 2px;
+}
+
+/* ---- Flashcard actions ---- */
+.ys-fc-actions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.ys-fc-actions .ys-btn {
+  flex: 1;
+}
+
+.ys-btn-primary {
+  background: #2a78d4;
+  color: #fff;
+}
+
+.ys-btn-primary:hover:not(:disabled) {
+  background: #3a88e4;
+}
+
+.ys-btn-block {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.ys-btn-ghost {
+  background: transparent;
+  border: 1px solid #444;
+  color: #aaa;
+}
+
+.ys-btn-ghost:hover {
+  background: #252540;
+  color: #e0e0e0;
+}
+
+.ys-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- Card list ---- */
+.ys-fc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ys-fc-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid #2a2a45;
+  font-size: 12px;
+}
+
+.ys-fc-word {
+  font-weight: 700;
+  color: #fff;
+  min-width: 44px;
+}
+
+.ys-fc-reading {
+  color: #888;
+  font-size: 11px;
+}
+
+.ys-fc-def {
+  flex: 1;
+  color: #bbb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ys-fc-due-badge {
+  font-size: 9px;
+  background: #1e3a6e;
+  color: #90b0ff;
+  border-radius: 3px;
+  padding: 1px 4px;
+  white-space: nowrap;
+}
+
+.ys-fc-delete {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.ys-fc-delete:hover {
+  color: #f44336;
+}
+
+/* ---- Review card ---- */
+.ys-fc-progress {
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.ys-fc-card {
+  background: #252540;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 12px;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.ys-fc-front-word {
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.ys-fc-front-reading {
+  font-size: 14px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+.ys-fc-divider {
+  border: none;
+  border-top: 1px solid #3a3a5a;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.ys-fc-defs {
+  text-align: left;
+  padding-left: 20px;
+  color: #d0d0d0;
+  font-size: 13px;
+  margin: 0;
+  width: 100%;
+}
+
+.ys-fc-defs li {
+  margin-bottom: 3px;
+}
+
+/* ---- Rating buttons ---- */
+.ys-fc-rate-row {
+  display: flex;
+  gap: 6px;
+}
+
+.ys-rate-btn {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.ys-rate-btn:hover {
+  opacity: 0.85;
+}
+
+.ys-rate-again { background: #5c1a1a; color: #ff8080; }
+.ys-rate-hard  { background: #4a3000; color: #ffb840; }
+.ys-rate-good  { background: #1a3d5c; color: #60b0ff; }
+.ys-rate-easy  { background: #1a3d28; color: #60d080; }
+
+/* ---- Quiz ---- */
+.ys-fc-quiz-prompt {
+  font-size: 14px;
+  text-align: center;
+  margin-bottom: 12px;
+  color: #e0e0e0;
+}
+
+.ys-fc-quiz-prompt strong {
+  font-size: 22px;
+  color: #fff;
+  display: block;
+  margin-top: 4px;
+}
+
+.ys-fc-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ys-choice-btn {
+  background: #252540;
+  border: 1px solid #3a3a5a;
+  color: #d0d0d0;
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ys-choice-btn:hover:not(:disabled) {
+  background: #2e2e58;
+}
+
+.ys-choice-btn:disabled {
+  cursor: default;
+}
+
+.ys-choice--correct {
+  background: #1a3d28 !important;
+  border-color: #2a6040 !important;
+  color: #60d080 !important;
+}
+
+.ys-choice--wrong {
+  background: #3d1a1a !important;
+  border-color: #602a2a !important;
+  color: #ff8080 !important;
+}
+
+.ys-fc-quiz-result {
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.ys-fc-quiz-result.correct { color: #60d080; }
+.ys-fc-quiz-result.wrong   { color: #ff8080; }
+
+/* ---- Session done ---- */
+.ys-fc-done {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.ys-fc-done-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+
+.ys-fc-done-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.ys-fc-done-sub {
+  font-size: 13px;
+  color: #aaa;
+  margin-bottom: 16px;
+}
+
+/* ---- Empty / loading ---- */
+.ys-fc-empty {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  padding: 16px 0;
+  line-height: 1.5;
+}
+
+.ys-fc-loading {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  padding: 20px 0;
+}

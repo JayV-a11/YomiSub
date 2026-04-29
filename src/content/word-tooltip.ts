@@ -13,6 +13,10 @@
 import type { LookupResult, Word } from '@/shared/types'
 import { clamp, escapeHtml } from '@/shared/utils'
 
+export interface TooltipOptions {
+  onSave?: (word: Word, result: LookupResult) => Promise<{ isNew: boolean }>
+}
+
 export interface TooltipController {
   mount: (shadow: ShadowRoot) => void
   show: (word: Word, anchorRect: DOMRect, result: LookupResult) => void
@@ -20,14 +24,19 @@ export interface TooltipController {
   isVisible: () => boolean
 }
 
-export function createTooltipController(): TooltipController {
+export function createTooltipController(options: TooltipOptions = {}): TooltipController {
   let tooltip: HTMLDivElement | null = null
+  let shadowHost: Element | null = null
   let visible = false
   let outsideClickHandler: ((e: MouseEvent) => void) | null = null
+  let currentWord: Word | null = null
+  let currentResult: LookupResult | null = null
 
   // ---- Mounting -------------------------------------------------------------
 
   function mount(shadow: ShadowRoot): void {
+    shadowHost = shadow.host
+
     const style = document.createElement('style')
     style.textContent = tooltipStyles()
     shadow.appendChild(style)
@@ -38,10 +47,12 @@ export function createTooltipController(): TooltipController {
     tooltip.setAttribute('aria-hidden', 'true')
     shadow.appendChild(tooltip)
 
-    // Close on click outside (uses composedPath to pierce Shadow DOM boundary)
+    // Close on click outside. We check the shadow HOST (not the internal tooltip
+    // element) because with a closed Shadow DOM, composedPath() observed from
+    // outside the root does not include internal elements — only the host.
     outsideClickHandler = (e: MouseEvent): void => {
-      if (!visible || tooltip === null) return
-      if (!e.composedPath().includes(tooltip)) {
+      if (!visible || shadowHost === null) return
+      if (!e.composedPath().includes(shadowHost)) {
         hide()
       }
     }
@@ -60,9 +71,22 @@ export function createTooltipController(): TooltipController {
   function show(word: Word, anchorRect: DOMRect, result: LookupResult): void {
     if (tooltip === null) return
 
-    tooltip.innerHTML = buildContent(word, result)
+    currentWord = word
+    currentResult = result
+    tooltip.innerHTML = buildContent(word, result, !!options.onSave)
     tooltip.setAttribute('aria-hidden', 'false')
     visible = true
+
+    // Wire up save button if onSave provided
+    if (options.onSave) {
+      const saveBtn = tooltip.querySelector<HTMLButtonElement>('.ys-save-btn')
+      if (saveBtn) {
+        saveBtn.addEventListener('click', (e) => {
+          e.stopPropagation()
+          void handleSave(saveBtn)
+        })
+      }
+    }
 
     // Position after paint — we need the rendered dimensions
     requestAnimationFrame(() => {
@@ -70,11 +94,26 @@ export function createTooltipController(): TooltipController {
     })
   }
 
+  async function handleSave(btn: HTMLButtonElement): Promise<void> {
+    if (!currentWord || !currentResult || !options.onSave) return
+    btn.disabled = true
+    try {
+      const { isNew } = await options.onSave(currentWord, currentResult)
+      btn.textContent = isNew ? '✓ Saved' : '✓ Already in deck'
+      btn.classList.add('ys-save-btn--saved')
+    } catch {
+      btn.textContent = 'Save failed'
+      btn.disabled = false
+    }
+  }
+
   function hide(): void {
     if (tooltip === null) return
     tooltip.setAttribute('aria-hidden', 'true')
     tooltip.innerHTML = ''
     visible = false
+    currentWord = null
+    currentResult = null
   }
 
   function isVisible(): boolean {
@@ -107,7 +146,7 @@ function positionTooltip(tooltip: HTMLDivElement, anchor: DOMRect): void {
 
 // ---- Content ---------------------------------------------------------------
 
-function buildContent(word: Word, result: LookupResult): string {
+function buildContent(word: Word, result: LookupResult, hasSave = false): string {
   const posLabel = posToEnglish(result.partOfSpeech || word.partOfSpeech)
   const showReading = result.reading && result.reading !== result.word
   const defs = result.definitions.slice(0, 5)
@@ -125,6 +164,7 @@ function buildContent(word: Word, result: LookupResult): string {
     }
     ${result.source === 'not-found' ? '<p class="ys-nf">Not found in dictionary</p>' : ''}
     ${result.source === 'api' ? '<p class="ys-src">via translation API</p>' : ''}
+    ${hasSave ? '<button class="ys-save-btn" type="button">+ Add to deck</button>' : ''}
   `
 }
 
@@ -224,6 +264,37 @@ function tooltipStyles(): string {
       font-size: 11px;
       margin: 4px 0 0;
       text-align: right;
+    }
+
+    .ys-save-btn {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      padding: 5px 10px;
+      background: #1e3a6e;
+      color: #90b0ff;
+      border: 1px solid #2a4080;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s;
+    }
+
+    .ys-save-btn:hover:not(:disabled) {
+      background: #2a4080;
+    }
+
+    .ys-save-btn--saved {
+      background: #1a3a28;
+      color: #4caf50;
+      border-color: #2a5a38;
+      cursor: default;
+    }
+
+    .ys-save-btn:disabled {
+      opacity: 0.7;
+      cursor: default;
     }
   `
 }
