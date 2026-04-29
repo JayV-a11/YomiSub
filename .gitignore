@@ -10,8 +10,10 @@ public/dict/*.trie
 public/dict/*.json
 public/dict/*.gz
 
-# JMdict (large file — download separately)
+# JMdict (large files — download separately via scripts/download-jmdict.mjs)
 src/assets/jmdict/jmdict-en.json
+src/assets/jmdict/*.tgz
+src/assets/jmdict/*.gz
 
 # Coverage & mutation reports
 coverage/
