@@ -1,0 +1,26 @@
+# Dependency directories
+node_modules/
+
+# Build output
+dist/
+
+# Kuromoji dict (generated — copied from node_modules)
+public/dict/*.dat
+public/dict/*.trie
+public/dict/*.json
+public/dict/*.gz
+
+# JMdict (large file — download separately)
+src/assets/jmdict/jmdict-en.json
+
+# Coverage & mutation reports
+coverage/
+reports/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+*.swp

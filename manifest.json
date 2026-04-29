@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "YomiSub",
+  "version": "0.1.0",
+  "description": "Interactive Japanese subtitles for YouTube — click any word to see translation and furigana",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["https://www.youtube.com/*"],
+  "optional_permissions": ["clipboardWrite"],
+  "background": {
+    "service_worker": "src/background/service-worker.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["src/content/index.ts"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "YomiSub"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dict/*", "assets/*"],
+      "matches": ["https://www.youtube.com/*"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
