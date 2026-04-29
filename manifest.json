@@ -23,7 +23,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["dict/*", "assets/*"],
+      "resources": ["dict/*", "assets/*", "assets/jmdict/*"],
       "matches": ["https://www.youtube.com/*"]
     }
   ],

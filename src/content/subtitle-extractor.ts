@@ -151,18 +151,87 @@ function decodeHtmlEntities(text: string): string {
 
 // ---- Fetch -----------------------------------------------------------------
 
-export async function fetchSubtitleCues(track: CaptionTrack): Promise<SubtitleCue[]> {
-  // Always request XML format — fmt=json3 has a different schema
-  const url = new URL(track.baseUrl)
-  url.searchParams.set('fmt', 'xml')
+// ---- JSON3 parsing -------------------------------------------------------
 
-  const response = await fetch(url.toString())
-  if (!response.ok) {
-    throw new Error(`Subtitle fetch failed — HTTP ${response.status}`)
+interface Json3Event {
+  tStartMs?: number
+  dDurationMs?: number
+  segs?: Array<{ utf8?: string }>
+}
+
+interface Json3Response {
+  events?: Json3Event[]
+}
+
+export function parseJson3Cues(json: Json3Response): SubtitleCue[] {
+  const cues: SubtitleCue[] = []
+  for (const ev of json.events ?? []) {
+    if (ev.tStartMs === undefined) continue
+    const start = ev.tStartMs / 1000
+    const dur = (ev.dDurationMs ?? 0) / 1000
+    const text = (ev.segs ?? []).map((s) => s.utf8 ?? '').join('').trim()
+    if (text.length === 0 || text === '\n') continue
+    cues.push({ start, end: start + dur, text, words: [] })
+  }
+  return cues
+}
+
+// ---- Fetch -----------------------------------------------------------------
+
+export async function fetchSubtitleCues(track: CaptionTrack): Promise<SubtitleCue[]> {
+  logger('baseUrl:', track.baseUrl.slice(0, 150))
+
+  // Try the URL as-is first (YouTube already includes fmt in baseUrl sometimes)
+  const tryFetch = async (url: string): Promise<string> => {
+    const r = await fetch(url)
+    logger(`fetch ${url.slice(0, 80)} → HTTP ${r.status}, content-type: ${r.headers.get('content-type')}`)
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const text = await r.text()
+    logger(`response length: ${text.length}, first 300:`, text.slice(0, 300))
+    return text
   }
 
-  const xml = await response.text()
-  return parseXmlCues(xml)
+  // Build URL variants to try in order
+  const base = new URL(track.baseUrl)
+  const urlJson3 = new URL(track.baseUrl)
+  urlJson3.searchParams.set('fmt', 'json3')
+  const urlXml = new URL(track.baseUrl)
+  urlXml.searchParams.set('fmt', 'xml')
+
+  const attempts = [
+    urlJson3.toString(),
+    base.toString(),
+    urlXml.toString(),
+  ]
+
+  for (const url of attempts) {
+    try {
+      const text = await tryFetch(url)
+      if (text.length === 0) continue
+
+      // Try JSON3
+      try {
+        const json = JSON.parse(text) as Json3Response
+        if (json.events) {
+          const cues = parseJson3Cues(json)
+          logger(`Parsed ${cues.length} cues from JSON3`)
+          return cues
+        }
+      } catch { /* not json */ }
+
+      // Try XML
+      const cues = parseXmlCues(text)
+      if (cues.length > 0) {
+        logger(`Parsed ${cues.length} cues from XML`)
+        return cues
+      }
+    } catch (e) {
+      logger('fetch attempt failed:', e)
+    }
+  }
+
+  logger('All fetch attempts failed or returned 0 cues')
+  return []
 }
 
 // ---- Public API ------------------------------------------------------------

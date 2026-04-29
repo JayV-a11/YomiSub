@@ -18,6 +18,8 @@ export interface OverlayController {
   unmount: () => void
   sync: (video: HTMLVideoElement, cues: SubtitleCue[]) => void
   stopSync: () => void
+  showWords: (words: Word[]) => void
+  clearWords: () => void
   updateSettings: (fontSize: string, position: 'over' | 'below') => void
 }
 
@@ -130,6 +132,24 @@ export function createOverlayController(
     lastRenderedText = null
   }
 
+  // ---- Direct word rendering (DOM-observer path) ---------------------------
+
+  function showWords(words: Word[]): void {
+    if (container === null) return
+    container.innerHTML = ''
+    lastRenderedText = null
+    if (words.length === 0) return
+    const fragment = document.createDocumentFragment()
+    for (const word of words) fragment.appendChild(createWordSpan(word))
+    container.appendChild(fragment)
+  }
+
+  function clearWords(): void {
+    if (container === null) return
+    container.innerHTML = ''
+    lastRenderedText = null
+  }
+
   // ---- Settings -------------------------------------------------------------
 
   function updateSettings(fontSize: string, position: 'over' | 'below'): void {
@@ -138,7 +158,7 @@ export function createOverlayController(
     container.dataset['position'] = position
   }
 
-  return { mount, unmount, sync, stopSync, updateSettings }
+  return { mount, unmount, sync, stopSync, showWords, clearWords, updateSettings }
 }
 
 // ---- Styles ----------------------------------------------------------------

@@ -12,7 +12,7 @@ import { getSettings } from '@/shared/storage'
 import { OVERLAY_ROOT_ID, FONT_SIZE_MAP, TOOLTIP_DEBOUNCE_MS } from '@/shared/constants'
 import { logger, debounce } from '@/shared/utils'
 import { createPlayerObserver } from './player-observer'
-import { extractSubtitles, hasJapaneseSubtitles } from './subtitle-extractor'
+import { watchYoutubeSubtitles } from './subtitle-dom-reader'
 import { initTokenizer, segmentText } from './word-segmenter'
 import { createOverlayController } from './subtitle-overlay'
 import { createTooltipController } from './word-tooltip'
@@ -20,7 +20,9 @@ import { lookupWord } from './jmdict-lookup'
 import type { Word } from '@/shared/types'
 
 async function bootstrap(): Promise<void> {
+  console.log('[YomiSub] bootstrap() starting on', location.href)
   const settings = await getSettings()
+  console.log('[YomiSub] settings loaded:', JSON.stringify(settings))
 
   if (!settings.enabled) {
     logger('Extension disabled via settings')
@@ -52,46 +54,46 @@ async function bootstrap(): Promise<void> {
 
   // ---- Handlers -------------------------------------------------------------
 
+  let stopCaptionWatch: (() => void) | null = null
+
   async function handleWordClick(word: Word, rect: DOMRect): Promise<void> {
     const result = await lookupWord(word.dictionaryForm, settings)
     tooltip.show(word, rect, result)
   }
 
-  async function onVideoFound(video: HTMLVideoElement): Promise<void> {
-    // YouTube SPA: ytInitialPlayerResponse may not be ready immediately after navigation.
-    // Retry up to 10 times with 300 ms intervals (3 s total) before giving up.
-    let found = hasJapaneseSubtitles()
-    if (!found) {
-      for (let i = 0; i < 10 && !found; i++) {
-        await new Promise<void>((r) => setTimeout(r, 300))
-        found = hasJapaneseSubtitles()
-      }
-    }
-    if (!found) {
-      logger('No Japanese subtitle track found for this video')
-      return
-    }
+  function onVideoFound(_video: HTMLVideoElement): void {
+    console.log('[YomiSub] onVideoFound — starting DOM caption observer')
 
-    let cues = await extractSubtitles()
-    if (cues.length === 0) {
-      logger('Subtitle extraction returned no cues')
-      return
-    }
+    // Stop any previous observer
+    stopCaptionWatch?.()
+    overlay.clearWords()
 
-    // Segment text — may fail if tokenizer not yet ready; unsegmented fallback is fine
-    try {
-      await initTokenizer()
-      cues = cues.map((cue) => ({ ...cue, words: segmentText(cue.text) }))
-    } catch (err) {
-      logger('Segmentation skipped (tokenizer not ready):', err)
-    }
-
-    overlay.sync(video, cues)
-    logger(`Playing with ${cues.length} subtitle cues`)
+    stopCaptionWatch = watchYoutubeSubtitles(
+      (text) => {
+        let words: Word[]
+        try {
+          words = segmentText(text)
+        } catch {
+          // Tokenizer not yet ready — show as single clickable block
+          words = [{
+            surface: text,
+            reading: text,
+            dictionaryForm: text,
+            partOfSpeech: '名詞',
+            startIndex: 0,
+            endIndex: text.length,
+          }]
+        }
+        overlay.showWords(words)
+      },
+      () => overlay.clearWords(),
+    )
   }
 
   function onVideoLost(): void {
-    overlay.stopSync()
+    stopCaptionWatch?.()
+    stopCaptionWatch = null
+    overlay.clearWords()
     tooltip.hide()
   }
 
@@ -104,6 +106,7 @@ async function bootstrap(): Promise<void> {
 
   // ---- Cleanup on navigation away ------------------------------------------
   window.addEventListener('beforeunload', () => {
+    stopCaptionWatch?.()
     observer.stop()
     overlay.unmount()
     host.remove()

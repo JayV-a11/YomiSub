@@ -1,11 +1,9 @@
 /**
- * Conditional logger — only logs in development builds.
+ * Conditional logger — always logs so runtime issues can be diagnosed.
  * Uses import.meta.env.DEV provided by Vite.
  */
 export function logger(...args: unknown[]): void {
-  if (import.meta.env.DEV) {
-    console.log('[YomiSub]', ...args)
-  }
+  console.log('[YomiSub]', ...args)
 }
 
 /**

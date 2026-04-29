@@ -14,6 +14,13 @@ export default defineConfig({
     tsconfigPaths(),
     crx({ manifest: manifest }),
   ],
+  resolve: {
+    alias: {
+      // Force the browser build of kuromoji — the Node.js source uses path.join
+      // which Vite externalizes and breaks at runtime in the extension context.
+      kuromoji: 'kuromoji/build/kuromoji.js',
+    },
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
@@ -24,7 +31,7 @@ export default defineConfig({
       },
     },
   },
-  // Prevent Vite from pre-bundling kuromoji (uses dynamic requires internally)
+  // kuromoji browser build is already bundled — no need to pre-bundle
   optimizeDeps: {
     exclude: ['kuromoji'],
   },

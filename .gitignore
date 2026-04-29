@@ -14,6 +14,7 @@ public/dict/*.gz
 src/assets/jmdict/jmdict-en.json
 src/assets/jmdict/*.tgz
 src/assets/jmdict/*.gz
+public/assets/jmdict/jmdict-en.json
 
 # Coverage & mutation reports
 coverage/
