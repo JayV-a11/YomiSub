@@ -239,7 +239,7 @@ describe('createTooltipController — save button', () => {
     // Allow microtask queue to flush
     await Promise.resolve()
 
-    expect(onSave).toHaveBeenCalledWith(word, result)
+    expect(onSave).toHaveBeenCalledWith(word, result, null)
   })
 
   it('shows "✓ Saved" feedback when onSave resolves with isNew=true', async () => {

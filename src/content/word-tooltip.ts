@@ -10,11 +10,21 @@
  *   - NEVER blocks YouTube's player controls
  *   - NEVER knows about subtitle sync or segmentation
  */
-import type { LookupResult, Word } from '@/shared/types'
+import type { CardContext, LookupResult, Word } from '@/shared/types'
 import { clamp, escapeHtml } from '@/shared/utils'
 
 export interface TooltipOptions {
-  onSave?: (word: Word, result: LookupResult) => Promise<{ isNew: boolean }>
+  onSave?: (
+    word: Word,
+    result: LookupResult,
+    context: CardContext | null,
+  ) => Promise<{ isNew: boolean }>
+  /**
+   * Called by the tooltip at click time to ask the host page for the current
+   * subtitle sentence and video timing. Returns null if no video context is
+   * available (e.g. tokenizer warming, page not a video page).
+   */
+  getContext?: () => CardContext | null
 }
 
 export interface TooltipController {
@@ -31,6 +41,7 @@ export function createTooltipController(options: TooltipOptions = {}): TooltipCo
   let outsideClickHandler: ((e: MouseEvent) => void) | null = null
   let currentWord: Word | null = null
   let currentResult: LookupResult | null = null
+  let currentContext: CardContext | null = null
 
   // ---- Mounting -------------------------------------------------------------
 
@@ -73,7 +84,8 @@ export function createTooltipController(options: TooltipOptions = {}): TooltipCo
 
     currentWord = word
     currentResult = result
-    tooltip.innerHTML = buildContent(word, result, !!options.onSave)
+    currentContext = options.getContext ? options.getContext() : null
+    tooltip.innerHTML = buildContent(word, result, !!options.onSave, currentContext)
     tooltip.setAttribute('aria-hidden', 'false')
     visible = true
 
@@ -98,7 +110,7 @@ export function createTooltipController(options: TooltipOptions = {}): TooltipCo
     if (!currentWord || !currentResult || !options.onSave) return
     btn.disabled = true
     try {
-      const { isNew } = await options.onSave(currentWord, currentResult)
+      const { isNew } = await options.onSave(currentWord, currentResult, currentContext)
       btn.textContent = isNew ? '✓ Saved' : '✓ Already in deck'
       btn.classList.add('ys-save-btn--saved')
     } catch {
@@ -114,6 +126,7 @@ export function createTooltipController(options: TooltipOptions = {}): TooltipCo
     visible = false
     currentWord = null
     currentResult = null
+    currentContext = null
   }
 
   function isVisible(): boolean {
@@ -146,7 +159,12 @@ function positionTooltip(tooltip: HTMLDivElement, anchor: DOMRect): void {
 
 // ---- Content ---------------------------------------------------------------
 
-function buildContent(word: Word, result: LookupResult, hasSave = false): string {
+function buildContent(
+  word: Word,
+  result: LookupResult,
+  hasSave = false,
+  context: CardContext | null = null,
+): string {
   const posLabel = posToEnglish(result.partOfSpeech || word.partOfSpeech)
   const showReading = result.reading && result.reading !== result.word
   const defs = result.definitions.slice(0, 5)
@@ -164,7 +182,25 @@ function buildContent(word: Word, result: LookupResult, hasSave = false): string
     }
     ${result.source === 'not-found' ? '<p class="ys-nf">Not found in dictionary</p>' : ''}
     ${result.source === 'api' ? '<p class="ys-src">via translation API</p>' : ''}
+    ${context ? buildContextPreview(context, word.surface) : ''}
     ${hasSave ? '<button class="ys-save-btn" type="button">+ Add to deck</button>' : ''}
+  `
+}
+
+function buildContextPreview(context: CardContext, surface: string): string {
+  // Highlight the clicked word inside the sentence so the user sees what
+  // will be cloze-deleted during review. We only highlight the first match
+  // — multiple identical surfaces in one line are rare in practice.
+  const idx = context.sentence.indexOf(surface)
+  if (idx < 0) {
+    return `<p class="ys-ctx">${escapeHtml(context.sentence)}</p>`
+  }
+  const before = context.sentence.slice(0, idx)
+  const after = context.sentence.slice(idx + surface.length)
+  return `
+    <p class="ys-ctx">
+      ${escapeHtml(before)}<mark class="ys-ctx-mark">${escapeHtml(surface)}</mark>${escapeHtml(after)}
+    </p>
   `
 }
 
@@ -264,6 +300,27 @@ function tooltipStyles(): string {
       font-size: 11px;
       margin: 4px 0 0;
       text-align: right;
+    }
+
+    .ys-ctx {
+      margin: 8px 0 0;
+      padding: 6px 8px;
+      background: rgba(255,255,255,0.04);
+      border-left: 2px solid #2a4080;
+      border-radius: 3px;
+      font-size: 12px;
+      color: #b8b8c8;
+      line-height: 1.5;
+      max-height: 4.5em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ys-ctx-mark {
+      background: rgba(144,176,255,0.18);
+      color: #fff;
+      border-radius: 2px;
+      padding: 0 2px;
     }
 
     .ys-save-btn {

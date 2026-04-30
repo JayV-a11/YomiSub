@@ -16,6 +16,16 @@ src/assets/jmdict/*.tgz
 src/assets/jmdict/*.gz
 public/assets/jmdict/jmdict-en.json
 
+# KANJIDIC2 (download separately via scripts/download-kanjidic.mjs)
+src/assets/kanjidic/kanjidic2-en.json
+src/assets/kanjidic/*.tgz
+src/assets/kanjidic/*.gz
+public/assets/kanjidic/kanjidic2-compact.json
+
+# Pitch accent dict (download separately via scripts/download-pitch-accent.mjs)
+src/assets/pitch-accent/pitch-accent.json
+public/assets/pitch-accent/pitch-accent.json
+
 # Coverage & mutation reports
 coverage/
 reports/

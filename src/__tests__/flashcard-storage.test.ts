@@ -7,7 +7,7 @@ import {
   addFlashcard,
   reviewFlashcard,
 } from '@/shared/flashcard-storage'
-import { DEFAULT_EASE_FACTOR } from '@/shared/srs'
+import { DEFAULT_EASE_FACTOR, createInitialFsrsState } from '@/shared/srs'
 import type { FlashCard, Word, LookupResult } from '@/shared/types'
 
 // ---- Fixtures --------------------------------------------------------------
@@ -22,9 +22,15 @@ function makeCard(overrides: Partial<FlashCard> = {}): FlashCard {
     partOfSpeech: '名詞',
     definitions: ['student'],
     source: 'jmdict',
+    context: null,
+    kanjiBreakdown: [],
+    relatedWords: [],
+    pitchAccent: null,
+    fsrs: createInitialFsrsState(now),
     interval: 1,
     repetitions: 0,
     easeFactor: DEFAULT_EASE_FACTOR,
+    stability: 1,
     dueDate: now,
     addedAt: now,
     lastReviewedAt: null,
@@ -181,38 +187,42 @@ describe('reviewFlashcard', () => {
     await expect(reviewFlashcard('ghost', 3)).rejects.toThrow('ghost')
   })
 
-  it('updates interval and repetitions after a good review (quality=3)', async () => {
-    const card = makeCard({ repetitions: 0, interval: 1 })
+  it('increments reps after a good review (quality=3)', async () => {
+    const card = makeCard()
+    const repsBefore = card.fsrs.reps
     await upsertFlashcard(card)
 
     const updated = await reviewFlashcard(card.id, 3)
-    expect(updated.repetitions).toBe(1)
-    expect(updated.interval).toBe(1)
+    expect(updated.fsrs.reps).toBeGreaterThanOrEqual(repsBefore + 1)
     expect(updated.lastReviewedAt).not.toBeNull()
   })
 
-  it('resets streak after a failed review (quality=0)', async () => {
-    const card = makeCard({ repetitions: 3, interval: 15 })
+  it('schedules sooner after a failed review than after a good one', async () => {
+    const card = makeCard()
     await upsertFlashcard(card)
 
-    const updated = await reviewFlashcard(card.id, 0)
-    expect(updated.repetitions).toBe(0)
-    expect(updated.interval).toBe(1)
+    const failed = await reviewFlashcard(card.id, 0)
+    // Reset to a fresh card (overwriting back to initial state)
+    await upsertFlashcard(card)
+    const good = await reviewFlashcard(card.id, 4)
+
+    expect(failed.dueDate).toBeLessThan(good.dueDate)
   })
 
   it('persists updated card to storage', async () => {
     const card = makeCard()
+    const repsBefore = card.fsrs.reps
     await upsertFlashcard(card)
     await reviewFlashcard(card.id, 5)
 
     const fromStorage = await getFlashcard(card.id)
-    expect(fromStorage?.repetitions).toBe(1)
+    expect(fromStorage?.fsrs.reps).toBeGreaterThanOrEqual(repsBefore + 1)
     expect(fromStorage?.lastReviewedAt).not.toBeNull()
   })
 
   it('sets dueDate in the future after successful review', async () => {
     const now = Date.now()
-    const card = makeCard({ repetitions: 1, interval: 1 })
+    const card = makeCard()
     await upsertFlashcard(card)
 
     const updated = await reviewFlashcard(card.id, 4)

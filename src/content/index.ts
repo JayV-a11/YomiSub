@@ -16,8 +16,18 @@ import { watchYoutubeSubtitles } from './subtitle-dom-reader'
 import { initTokenizer, segmentText } from './word-segmenter'
 import { createOverlayController } from './subtitle-overlay'
 import { createTooltipController } from './word-tooltip'
-import { lookupWord } from './jmdict-lookup'
-import type { Word, LookupResult, Message } from '@/shared/types'
+import { lookupWord, findRelatedWords } from './jmdict-lookup'
+import { getKanjiBreakdown } from './kanji-info'
+import { getPitchAccent } from './pitch-accent'
+import type {
+  Word,
+  LookupResult,
+  Message,
+  CardContext,
+  KanjiInfo,
+  RelatedWord,
+  PitchAccentInfo,
+} from '@/shared/types'
 
 async function bootstrap(): Promise<void> {
   console.log('[YomiSub] bootstrap() starting on', location.href)
@@ -39,14 +49,51 @@ async function bootstrap(): Promise<void> {
   const shadow = host.attachShadow({ mode: 'closed' })
   document.body.appendChild(host)
 
+  // ---- Capture state --------------------------------------------------------
+  // Latest subtitle line and video element are tracked here so we can build a
+  // CardContext at the exact moment the user clicks "Add to deck".
+  let currentSentence = ''
+  let currentVideo: HTMLVideoElement | null = null
+
+  function buildCurrentContext(word: Word): CardContext | null {
+    if (currentSentence.length === 0) return null
+    const t = currentVideo?.currentTime ?? 0
+    return {
+      sentence: currentSentence,
+      wordSurface: word.surface,
+      videoUrl: buildVideoUrlWithTimestamp(t),
+      videoTitle: document.title,
+      timestampSeconds: t,
+      capturedAt: Date.now(),
+    }
+  }
+
   // ---- Controllers ----------------------------------------------------------
   const overlay = createOverlayController(
     debounce((word: Word, rect: DOMRect) => void handleWordClick(word, rect), TOOLTIP_DEBOUNCE_MS),
   )
+  // Context for the next save is captured eagerly when the tooltip opens
+  // (handleWordClick) so it survives the click → tooltip mount → button click
+  // round-trip even if the subtitle changes meanwhile.
+  let pendingContext: CardContext | null = null
+  let pendingKanjiBreakdown: KanjiInfo[] = []
+  let pendingRelatedWords: RelatedWord[] = []
+  let pendingPitchAccent: PitchAccentInfo | null = null
   const tooltip = createTooltipController({
-    onSave: (word: Word, result: LookupResult) =>
+    getContext: () => pendingContext,
+    onSave: (word: Word, result: LookupResult, context: CardContext | null) =>
       new Promise((resolve, reject) => {
-        const msg: Message = { type: 'ADD_FLASHCARD', payload: { word, result } }
+        const msg: Message = {
+          type: 'ADD_FLASHCARD',
+          payload: {
+            word,
+            result,
+            context,
+            kanjiBreakdown: pendingKanjiBreakdown,
+            relatedWords: pendingRelatedWords,
+            pitchAccent: pendingPitchAccent,
+          },
+        }
         chrome.runtime.sendMessage(msg, (response: Message) => {
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message))
@@ -73,12 +120,30 @@ async function bootstrap(): Promise<void> {
   let stopCaptionWatch: (() => void) | null = null
 
   async function handleWordClick(word: Word, rect: DOMRect): Promise<void> {
-    const result = await lookupWord(word.dictionaryForm, settings)
+    // Snapshot context at click time — subtitle may change while the
+    // dictionary lookup is still pending.
+    pendingContext = buildCurrentContext(word)
+    // Run dictionary + kanji + related + pitch lookups in parallel — independent.
+    const [result, kanjiBreakdown, relatedWords] = await Promise.all([
+      lookupWord(word.dictionaryForm, settings),
+      getKanjiBreakdown(word.dictionaryForm).catch(() => [] as KanjiInfo[]),
+      findRelatedWords(word.dictionaryForm).catch(() => [] as RelatedWord[]),
+    ])
+    // Pitch accent depends on the reading from the lookup, so it runs after.
+    const pitchAccent = await getPitchAccent(
+      word.dictionaryForm,
+      result.reading || word.reading,
+    ).catch(() => null)
+
+    pendingKanjiBreakdown = kanjiBreakdown
+    pendingRelatedWords = relatedWords
+    pendingPitchAccent = pitchAccent
     tooltip.show(word, rect, result)
   }
 
-  function onVideoFound(_video: HTMLVideoElement): void {
+  function onVideoFound(video: HTMLVideoElement): void {
     console.log('[YomiSub] onVideoFound — starting DOM caption observer')
+    currentVideo = video
 
     // Stop any previous observer
     stopCaptionWatch?.()
@@ -86,6 +151,7 @@ async function bootstrap(): Promise<void> {
 
     stopCaptionWatch = watchYoutubeSubtitles(
       (text) => {
+        currentSentence = text
         let words: Word[]
         try {
           words = segmentText(text)
@@ -102,13 +168,18 @@ async function bootstrap(): Promise<void> {
         }
         overlay.showWords(words)
       },
-      () => overlay.clearWords(),
+      () => {
+        currentSentence = ''
+        overlay.clearWords()
+      },
     )
   }
 
   function onVideoLost(): void {
     stopCaptionWatch?.()
     stopCaptionWatch = null
+    currentVideo = null
+    currentSentence = ''
     overlay.clearWords()
     tooltip.hide()
   }
@@ -127,6 +198,22 @@ async function bootstrap(): Promise<void> {
     overlay.unmount()
     host.remove()
   })
+}
+
+/**
+ * Builds a deep-link URL that opens the current page at a specific timestamp.
+ * Works for YouTube (?t=N) and degrades gracefully on other sites — the param
+ * is harmless even if the host doesn't honour it.
+ */
+function buildVideoUrlWithTimestamp(seconds: number): string {
+  try {
+    const url = new URL(location.href)
+    const t = Math.max(0, Math.floor(seconds))
+    url.searchParams.set('t', `${t}`)
+    return url.toString()
+  } catch {
+    return location.href
+  }
 }
 
 bootstrap().catch((err: unknown) => {

@@ -2,16 +2,17 @@ import { describe, it, expect } from 'vitest'
 import {
   calculateNextReview,
   createFlashCard,
+  createInitialFsrsState,
   isDue,
   getDueCards,
   DEFAULT_EASE_FACTOR,
-  MIN_EASE_FACTOR,
 } from '@/shared/srs'
 import type { FlashCard, Word, LookupResult } from '@/shared/types'
 
 // ---- Fixtures --------------------------------------------------------------
 
 function makeCard(overrides: Partial<FlashCard> = {}): FlashCard {
+  const addedAt = Date.now() - 86400_000
   return {
     id: '学生',
     word: '学生',
@@ -20,11 +21,17 @@ function makeCard(overrides: Partial<FlashCard> = {}): FlashCard {
     partOfSpeech: '名詞',
     definitions: ['student'],
     source: 'jmdict',
+    context: null,
+    kanjiBreakdown: [],
+    relatedWords: [],
+    pitchAccent: null,
+    fsrs: createInitialFsrsState(addedAt),
     interval: 1,
     repetitions: 0,
     easeFactor: DEFAULT_EASE_FACTOR,
+    stability: 1,
     dueDate: Date.now() - 1000,
-    addedAt: Date.now() - 86400_000,
+    addedAt,
     lastReviewedAt: null,
     ...overrides,
   }
@@ -52,68 +59,50 @@ function makeResult(overrides: Partial<LookupResult> = {}): LookupResult {
   }
 }
 
-// ---- calculateNextReview ---------------------------------------------------
+// ---- calculateNextReview (FSRS) --------------------------------------------
 
-describe('calculateNextReview', () => {
-  it('resets interval and repetitions when quality < 3 (again)', () => {
-    const card = makeCard({ interval: 10, repetitions: 4 })
-    const result = calculateNextReview(card, 0)
-    expect(result.interval).toBe(1)
-    expect(result.repetitions).toBe(0)
-  })
-
-  it('resets interval and repetitions when quality = 2 (hard boundary)', () => {
-    const card = makeCard({ interval: 10, repetitions: 3 })
-    const result = calculateNextReview(card, 2)
-    expect(result.interval).toBe(1)
-    expect(result.repetitions).toBe(0)
-  })
-
-  it('sets interval to 1 on first success (repetitions = 0)', () => {
-    const card = makeCard({ repetitions: 0 })
+describe('calculateNextReview (FSRS)', () => {
+  it('increments reps after a successful review', () => {
+    const card = makeCard()
     const result = calculateNextReview(card, 3)
-    expect(result.interval).toBe(1)
-    expect(result.repetitions).toBe(1)
+    expect(result.repetitions).toBeGreaterThanOrEqual(1)
   })
 
-  it('sets interval to 6 on second success (repetitions = 1)', () => {
-    const card = makeCard({ repetitions: 1, interval: 1 })
-    const result = calculateNextReview(card, 3)
-    expect(result.interval).toBe(6)
-    expect(result.repetitions).toBe(2)
-  })
-
-  it('multiplies interval by easeFactor on subsequent successes', () => {
-    const card = makeCard({ repetitions: 2, interval: 6, easeFactor: 2.5 })
-    const result = calculateNextReview(card, 4)
-    expect(result.interval).toBe(Math.round(6 * 2.5))
-    expect(result.repetitions).toBe(3)
-  })
-
-  it('increases easeFactor for quality 5', () => {
-    const card = makeCard({ easeFactor: 2.5 })
-    const result = calculateNextReview(card, 5)
-    expect(result.easeFactor).toBeGreaterThan(2.5)
-  })
-
-  it('decreases easeFactor for quality 3', () => {
-    const card = makeCard({ easeFactor: 2.5 })
-    const result = calculateNextReview(card, 3)
-    expect(result.easeFactor).toBeLessThan(2.5)
-  })
-
-  it('never lets easeFactor drop below MIN_EASE_FACTOR', () => {
-    const card = makeCard({ easeFactor: MIN_EASE_FACTOR })
-    const result = calculateNextReview(card, 0)
-    expect(result.easeFactor).toBeGreaterThanOrEqual(MIN_EASE_FACTOR)
-  })
-
-  it('sets dueDate in the future based on interval', () => {
-    const now = Date.now()
-    const card = makeCard({ repetitions: 1, interval: 1 })
+  it('returns a future dueDate after a Good rating', () => {
+    const now = 1_700_000_000_000
+    const card = makeCard({ fsrs: createInitialFsrsState(now) })
     const result = calculateNextReview(card, 3, now)
-    // interval=6 days from now
-    expect(result.dueDate).toBe(now + 6 * 24 * 60 * 60 * 1000)
+    expect(result.dueDate).toBeGreaterThan(now)
+  })
+
+  it('schedules sooner for Again than for Easy', () => {
+    const now = 1_700_000_000_000
+    const card = makeCard({ fsrs: createInitialFsrsState(now) })
+    const again = calculateNextReview(card, 0, now)
+    const easy = calculateNextReview(card, 5, now)
+    expect(again.dueDate).toBeLessThan(easy.dueDate)
+  })
+
+  it('schedules sooner for Hard than for Good', () => {
+    const now = 1_700_000_000_000
+    const card = makeCard({ fsrs: createInitialFsrsState(now) })
+    const hard = calculateNextReview(card, 2, now)
+    const good = calculateNextReview(card, 3, now)
+    expect(hard.dueDate).toBeLessThanOrEqual(good.dueDate)
+  })
+
+  it('persists FSRS state for the next review', () => {
+    const now = 1_700_000_000_000
+    const card = makeCard({ fsrs: createInitialFsrsState(now) })
+    const result = calculateNextReview(card, 3, now)
+    expect(result.fsrs.reps).toBeGreaterThanOrEqual(1)
+    expect(result.fsrs.due).toBe(result.dueDate)
+  })
+
+  it('mirrors fsrs.due into dueDate for cheap filtering', () => {
+    const card = makeCard()
+    const result = calculateNextReview(card, 3)
+    expect(result.dueDate).toBe(result.fsrs.due)
   })
 
   it('sets lastReviewedAt to now', () => {
@@ -123,11 +112,17 @@ describe('calculateNextReview', () => {
     expect(result.lastReviewedAt).toBe(now)
   })
 
-  it('quality 1 resets the streak (< 3)', () => {
-    const card = makeCard({ repetitions: 5, interval: 30 })
-    const result = calculateNextReview(card, 1)
-    expect(result.repetitions).toBe(0)
-    expect(result.interval).toBe(1)
+  it('increments lapses when rating is Again after a successful streak', () => {
+    const now = 1_700_000_000_000
+    let card = makeCard({ fsrs: createInitialFsrsState(now) })
+    // Build up a few good reviews
+    let upd = calculateNextReview(card, 4, now)
+    card = { ...card, fsrs: upd.fsrs }
+    upd = calculateNextReview(card, 4, now + 86400_000)
+    card = { ...card, fsrs: upd.fsrs }
+    const before = card.fsrs.lapses
+    upd = calculateNextReview(card, 0, now + 2 * 86400_000)
+    expect(upd.fsrs.lapses).toBeGreaterThanOrEqual(before + 1)
   })
 })
 
@@ -169,7 +164,7 @@ describe('createFlashCard', () => {
 
   it('sets dueDate equal to addedAt (due immediately)', () => {
     const now = 1_700_000_000_000
-    const card = createFlashCard(makeWord(), makeResult(), now)
+    const card = createFlashCard(makeWord(), makeResult(), {}, now)
     expect(card.dueDate).toBe(now)
     expect(card.addedAt).toBe(now)
   })

@@ -31,7 +31,12 @@ chrome.runtime.onMessage.addListener(
         return true
 
       case 'ADD_FLASHCARD':
-        addFlashcard(message.payload.word, message.payload.result)
+        addFlashcard(message.payload.word, message.payload.result, {
+          context: message.payload.context,
+          kanjiBreakdown: message.payload.kanjiBreakdown,
+          relatedWords: message.payload.relatedWords,
+          pitchAccent: message.payload.pitchAccent,
+        })
           .then(({ isNew }) =>
             sendResponse({ type: 'ADD_FLASHCARD_RESULT', success: true, isNew }),
           )

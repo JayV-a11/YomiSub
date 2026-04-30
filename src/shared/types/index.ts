@@ -83,7 +83,65 @@ export interface UserSettings {
   furiganaEnabled: boolean
 }
 
+// ---------- Kanji ----------
+
+export interface KanjiInfo {
+  char: string
+  meanings: string[]   // English meanings, max ~4
+  onyomi: string[]     // Sino-Japanese readings (e.g. セイ, ショウ)
+  kunyomi: string[]    // Native Japanese readings (e.g. ただ.しい)
+}
+
+// ---------- Related words ----------
+
+export interface RelatedWord {
+  word: string     // surface (kanji form if present)
+  reading: string  // hiragana reading
+  gloss: string    // first English definition (truncated)
+}
+
+// ---------- Pitch accent ----------
+
+export interface PitchAccentInfo {
+  reading: string    // the hiragana reading the pattern applies to
+  moraCount: number  // number of moras in the reading
+  patterns: number[] // NHK drop positions; 0=heiban, N=drop after mora N
+}
+
 // ---------- Flashcards / SRS ----------
+
+/**
+ * Captured at the moment a card is added: lets us show the source sentence
+ * (with cloze-deletion), link back to the exact video timestamp, and surface
+ * "Watch scene" actions during review.
+ */
+export interface CardContext {
+  sentence: string         // full subtitle line as shown when clicked
+  wordSurface: string      // exact surface clicked (for cloze masking)
+  videoUrl: string         // page URL with timestamp param e.g. ?t=72
+  videoTitle: string       // <title> of the page at capture time
+  timestampSeconds: number // video.currentTime at click
+  capturedAt: number       // ms timestamp
+}
+
+/**
+ * Serialised ts-fsrs Card. Stored on the FlashCard so we can deserialise into
+ * a real ts-fsrs Card on review without losing FSRS-internal state.
+ *
+ * Date fields are kept as ms timestamps for IndexedDB/JSON friendliness.
+ */
+export interface FsrsState {
+  due: number              // ms — when the card is next due
+  stability: number        // memory stability (days)
+  difficulty: number       // 1..10 — FSRS difficulty
+  elapsed_days: number
+  scheduled_days: number
+  learning_steps: number
+  reps: number             // total reviews
+  lapses: number           // times forgotten
+  state: 0 | 1 | 2 | 3     // 0=New, 1=Learning, 2=Review, 3=Relearning
+  last_review: number | null
+}
 
 export interface FlashCard {
   id: string              // = dictionaryForm (unique key per lemma)
@@ -93,13 +151,20 @@ export interface FlashCard {
   partOfSpeech: string
   definitions: string[]
   source: 'jmdict' | 'api' | 'not-found'
-  // SM-2 SRS fields
-  interval: number        // days until next review
-  repetitions: number     // successful review streak
-  easeFactor: number      // SM-2 ease factor (default 2.5)
-  dueDate: number         // ms timestamp when next review is due
+  context: CardContext | null // null for cards added without video context (e.g. legacy)
+  kanjiBreakdown: KanjiInfo[] // empty if word is kana-only or kanji not in dict
+  relatedWords: RelatedWord[] // entries sharing kanji with this word
+  pitchAccent: PitchAccentInfo | null // null if not in pitch dict
+  // SRS state — FSRS is canonical; legacy fields below are mirrors for display.
+  fsrs: FsrsState
+  dueDate: number         // mirror of fsrs.due — kept for cheap filtering
   addedAt: number         // ms timestamp when card was created
   lastReviewedAt: number | null
+  // Legacy SM-2 fields kept for migration / read-only display compatibility.
+  interval: number
+  repetitions: number
+  easeFactor: number
+  stability: number
 }
 
 // ---------- Messages (content ↔ service worker) ----------
@@ -112,7 +177,17 @@ export type Message =
   | { type: 'SAVE_SETTINGS_RESULT'; success: boolean; error?: string }
   | { type: 'TRANSLATE_WORD'; payload: { word: string; context?: string } }
   | { type: 'TRANSLATE_WORD_RESULT'; payload: LookupResult }
-  | { type: 'ADD_FLASHCARD'; payload: { word: Word; result: LookupResult } }
+  | {
+      type: 'ADD_FLASHCARD'
+      payload: {
+        word: Word
+        result: LookupResult
+        context: CardContext | null
+        kanjiBreakdown: KanjiInfo[]
+        relatedWords: RelatedWord[]
+        pitchAccent: PitchAccentInfo | null
+      }
+    }
   | { type: 'ADD_FLASHCARD_RESULT'; success: boolean; isNew: boolean; error?: string }
   | { type: 'GET_FLASHCARDS' }
   | { type: 'GET_FLASHCARDS_RESULT'; payload: FlashCard[] }
